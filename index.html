@@ -360,22 +360,49 @@ async function handleQuestion(text) {
   await speak(answer);
 }
 
-/* 2-КЕЗЕҢДЕ ОСЫ ФУНКЦИЯ BACKEND СЕРВЕРГЕ СҰРАНЫС ЖІБЕРЕДІ.
-   API key ешқашан осы файлға жазылмайды, ол тек серверде сақталады:
-   iPhone -> Frontend -> Backend -> AI API -> Backend -> iPhone
+/* ==========================================================
+   Claude API: сұраныс Cloudflare Worker арқылы жіберіледі.
+   API кілті бұл файлда ЖОҚ — ол тек Cloudflare ішіндегі Secret-те сақталады:
+   Телефон -> Осы бет -> Cloudflare Worker -> Claude API -> Worker -> Телефон
+   ========================================================== */
+const WORKER_URL = "https://winter-butterfly-6798.na1925956.workers.dev/";   // Worker сілтемесін осы жерге қоясың
+const history = [];            // соңғы сұрақ-жауаптар (әңгіме жалғасуы үшін)
+const MAX_HISTORY = 6;
 
-   Мысалы (кейін):
-   const r = await fetch("https://СІЗДІҢ-СЕРВЕР/api/ask", {
-     method: "POST",
-     headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ question })
-   });
-   return (await r.json()).answer;
-*/
 async function askAI(question) {
   const local = localAnswer(question);
   if (local) return local;
-  return "Бұл сұраққа толық жауап беру үшін маған AI миын қосу керек. Екінші кезеңде OpenAI немесе басқа AI API арқылы толыққанды жауап беру мүмкіндігін қосамыз.";
+
+  if (WORKER_URL.includes("PASTE-WORKER-URL-HERE")) {
+    return "Мен әлі Claude мейіріне қосылмағанмын. Worker сілтемесін кодқа қою керек.";
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const r = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [...history, { role: "user", content: question }],
+        lang: LANGS[langIdx].code
+      }),
+      signal: ctrl.signal
+    });
+    if (r.status === 429) return "Сұрақ тым жиі болды. Азғана күтіп, қайта сұрашы.";
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.answer) return "Кешір, қазір жауап бере алмадым. Сәлден соң қайта көрші.";
+
+    history.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+    while (history.length > MAX_HISTORY) history.shift();
+    return data.answer;
+  } catch (e) {
+    return (e && e.name === "AbortError")
+      ? "Жауап тым ұзақ келді. Қайта көрші."
+      : "Интернетке қосыла алмадым. Байланысты тексеріп көр.";
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /* ---------- Дайын жауаптар ---------- */
@@ -386,22 +413,11 @@ const has = (t, arr) => arr.some((w) => t.includes(w));
 
 const MONTHS = ["қаңтар","ақпан","наурыз","сәуір","мамыр","маусым","шілде","тамыз","қыркүйек","қазан","қараша","желтоқсан"];
 
+// Тек құрылғының өзі біледі: сағат пен күн. Қалған барлық сұраққа Claude жауап береді.
 const RULES = [
-  { test: (t) => has(t, ["сәлем", "салем", "сәлеметсіз", "привет", "hello", "hi "]),
-    reply: () => "Сәлем! Мен сені тыңдауға дайынмын." },
-  { test: (t) => has(t, ["қалайсың", "калайсын", "қал қалай", "қалың қалай", "как дела"]),
-    reply: () => "Жақсымын! Рақмет 😊 Өзің қалайсың?" },
-  { test: (t) => has(t, ["атың кім", "атын кім", "есімің кім", "сен кімсің", "ты кто"]),
-    reply: () => "Мен қазақша сөйлейтін AI роботпын." },
-  { test: (t) => t.includes("астана") && has(t, ["қай", "қандай", "қайсы", "қайда", "не", "астанасы"]),
-    reply: () => "Қазақстанның астанасы — Астана." },
-  { test: (t) => has(t, ["рақмет", "рахмет", "спасибо"]),
-    reply: () => "Оқасы жоқ! Әрқашан көмектесуге дайынмын." },
-  { test: (t) => has(t, ["сау бол", "көріскенше", "до свидания"]),
-    reply: () => "Сау бол! Тағы келіп тұр." },
   { test: (t) => has(t, ["сағат қанша", "уақыт қанша", "қазір сағат"]),
     reply: () => { const d = new Date(); return "Қазір сағат " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + "."; } },
-  { test: (t) => has(t, ["бүгін қай күн", "бүгін күні", "бүгін не күн", "қай күн"]),
+  { test: (t) => has(t, ["бүгін қай күн", "бүгін не күн", "бүгінгі күн", "бүгін күні қанша", "бүгін қай жыл"]),
     reply: () => { const d = new Date(); return "Бүгін " + d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear() + " жыл."; } }
 ];
 
@@ -451,7 +467,8 @@ function solveMath(t) {
   if (hasWord) s = wordsToDigits(s);
 
   let a, b, op;
-  const sym = s.match(/(\d+(?:\.\d+)?)\s*([+\-−–×*xх÷\/:])\s*(\d+(?:\.\d+)?)/i);
+  const pureMath = /^[\d\s.,+\-−–×*xх÷\/:=?]+$/.test(s);
+  const sym = (pureMath || hasWord) ? s.match(/(\d+(?:\.\d+)?)\s*([+\-−–×*xх÷\/:])\s*(\d+(?:\.\d+)?)/i) : null;
   if (sym) {
     a = parseFloat(sym[1]); b = parseFloat(sym[3]);
     const o = sym[2];
