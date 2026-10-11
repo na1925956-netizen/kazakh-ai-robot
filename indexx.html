@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Робот">
+<meta name="theme-color" content="#050912">
+<title>Қазақша AI Робот</title>
+
+<style>
+/* ==========================================================
+   1. НЕГІЗГІ ӨЗГЕРМЕЛІ ЖӘНЕ ТҮСТЕР
+   ========================================================== */
+:root {
+  --c-rgb: 61, 220, 255;           /* негізгі түс (idle: көгілдір) */
+  --bg: #050912;
+  --text: #dff8ff;
+  --w: min(78vw, 42dvh, 340px);    /* роботтың беті енінің өлшемі */
+}
+/* Режимге қарай түс өзгереді */
+body[data-mode="listening"] { --c-rgb: 70, 255, 170; }   /* жасыл */
+body[data-mode="speaking"]  { --c-rgb: 170, 120, 255; }  /* күлгін */
+body[data-mode="thinking"]  { --c-rgb: 255, 200, 80; }   /* сары */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, sans-serif;
+  -webkit-user-select: none; user-select: none;
+  touch-action: manipulation; overscroll-behavior: none;
+}
+body {
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 14px);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(var(--c-rgb), .13), transparent 60%),
+    var(--bg);
+  transition: background .6s;
+}
+
+/* ==========================================================
+   2. ЖОҒАРҒЫ ЖОЛ (тіл таңдау)
+   ========================================================== */
+.top { display: flex; justify-content: flex-end; padding-top: 10px; min-height: 44px; }
+#lang {
+  font: 700 13px/1 -apple-system, sans-serif; letter-spacing: 1px;
+  color: rgb(var(--c-rgb)); background: rgba(var(--c-rgb), .08);
+  border: 1px solid rgba(var(--c-rgb), .45); border-radius: 999px;
+  padding: 10px 16px;
+}
+
+/* ==========================================================
+   3. РОБОТТЫҢ БЕТІ
+   ========================================================== */
+.stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.face-wrap { position: relative; width: var(--w); height: calc(var(--w) * .92); }
+
+/* Антенна */
+.antenna { position: absolute; left: 50%; top: calc(var(--w) * -.09); width: 2px; height: calc(var(--w) * .1);
+  background: rgba(var(--c-rgb), .6); transform: translateX(-50%); }
+.antenna::after { content: ""; position: absolute; left: 50%; top: -7px; width: 12px; height: 12px; border-radius: 50%;
+  transform: translateX(-50%); background: rgb(var(--c-rgb)); box-shadow: 0 0 14px rgb(var(--c-rgb));
+  animation: pulse 2s ease-in-out infinite; }
+
+/* Дыбыс толқындары (тек listening кезінде көрінеді) */
+.ring { position: absolute; inset: 0; border-radius: 38% / 34%;
+  border: 2px solid rgba(var(--c-rgb), .7); opacity: 0; pointer-events: none; }
+body[data-mode="listening"] .ring { animation: wave 2.1s ease-out infinite; }
+body[data-mode="listening"] .ring:nth-child(2) { animation-delay: .7s; }
+body[data-mode="listening"] .ring:nth-child(3) { animation-delay: 1.4s; }
+
+.face {
+  position: absolute; inset: 0; overflow: hidden;
+  border-radius: 38% / 34%;
+  background: radial-gradient(ellipse at 50% 30%, #12203a 0%, #0a1224 55%, #060b17 100%);
+  border: 2px solid rgba(var(--c-rgb), .55);
+  box-shadow: 0 0 40px rgba(var(--c-rgb), .35), inset 0 0 40px rgba(var(--c-rgb), .15);
+  transition: box-shadow .5s, border-color .5s;
+}
+body[data-mode="speaking"] .face { animation: glowPulse .9s ease-in-out infinite; }
+/* Жарық сызығы беттің үстімен жүріп тұрады */
+.face::after { content: ""; position: absolute; left: 0; right: 0; height: 28%; top: -30%;
+  background: linear-gradient(180deg, transparent, rgba(var(--c-rgb), .14), transparent);
+  animation: scan 5s linear infinite; }
+
+/* Көздер */
+.eyes { position: absolute; inset: 0; transition: transform .4s; }
+body[data-mode="listening"] .eyes { transform: scale(1.1) translateY(-2%); }
+.eye {
+  position: absolute; top: 20%; width: 28%; height: 32%;
+  border-radius: 42%;
+  background: radial-gradient(ellipse at 50% 40%, #f0ffff 0%, rgb(var(--c-rgb)) 42%, rgba(var(--c-rgb), .55) 100%);
+  box-shadow: 0 0 calc(var(--w) * .07) rgba(var(--c-rgb), .8);
+  transform-origin: center; animation: blink 5s infinite; overflow: hidden;
+  transition: box-shadow .4s;
+}
+body[data-mode="listening"] .eye { box-shadow: 0 0 calc(var(--w) * .13) rgba(var(--c-rgb), 1); animation-duration: 3.2s; }
+.eye.l { left: 14%; }
+.eye.r { right: 14%; animation-delay: .04s; }
+.pupil { position: absolute; left: 50%; top: 50%; width: 38%; height: 44%; border-radius: 50%;
+  background: #04101c; transform: translate(-50%, -50%); animation: look 7s ease-in-out infinite; }
+.glint { position: absolute; left: 20%; top: 14%; width: 22%; height: 18%; border-radius: 50%;
+  background: rgba(255,255,255,.9); filter: blur(1px); }
+
+/* Мұрын / сенсор */
+.nose { position: absolute; left: 50%; top: 59%; width: 9%; height: 3.4%; transform: translateX(-50%);
+  border-radius: 99px; background: rgba(var(--c-rgb), .75); box-shadow: 0 0 12px rgba(var(--c-rgb), .9);
+  animation: pulse 2.4s ease-in-out infinite; }
+
+/* Ауыз */
+.mouth {
+  position: absolute; left: 50%; bottom: 11%; transform: translateX(-50%);
+  border: calc(var(--w) * .016) solid rgb(var(--c-rgb));
+  box-shadow: 0 0 14px rgba(var(--c-rgb), .7);
+  transition: width .09s, height .09s, border-radius .09s, background .09s;
+}
+.mouth[data-s="idle"]      { width: calc(var(--w)*.28); height: calc(var(--w)*.06); border-radius: 0 0 99px 99px; border-top-color: transparent; background: transparent; }
+.mouth[data-s="listening"] { width: calc(var(--w)*.10); height: calc(var(--w)*.10); border-radius: 50%; background: rgba(var(--c-rgb), .15); }
+.mouth[data-s="thinking"]  { width: calc(var(--w)*.16); height: calc(var(--w)*.02); border-radius: 99px; background: rgba(var(--c-rgb), .4); }
+.mouth[data-s="f0"] { width: calc(var(--w)*.26); height: calc(var(--w)*.03); border-radius: 99px; background: rgba(var(--c-rgb), .35); }
+.mouth[data-s="f1"] { width: calc(var(--w)*.26); height: calc(var(--w)*.09); border-radius: 12% 12% 50% 50%; background: rgba(var(--c-rgb), .25); }
+.mouth[data-s="f2"] { width: calc(var(--w)*.17); height: calc(var(--w)*.13); border-radius: 50%; background: rgba(var(--c-rgb), .25); }
+.mouth[data-s="f3"] { width: calc(var(--w)*.31); height: calc(var(--w)*.05); border-radius: 99px; background: rgba(var(--c-rgb), .3); }
+
+/* ==========================================================
+   4. СҰРАҚ-ЖАУАП ПАНЕЛІ (футуристік HUD)
+   ========================================================== */
+.hud {
+  margin: 6px 0 10px; padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(var(--c-rgb), .10), rgba(var(--c-rgb), .03));
+  border: 1px solid rgba(var(--c-rgb), .35);
+  border-left: 3px solid rgb(var(--c-rgb));
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  max-height: 26dvh; overflow-y: auto;
+  -webkit-user-select: text; user-select: text;
+}
+.row { display: flex; gap: 10px; align-items: baseline; }
+.row + .row { margin-top: 8px; }
+.tag { flex: none; min-width: 58px; font: 700 11px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 1.5px;
+  color: rgb(var(--c-rgb)); }
+.row p { margin: 0; font-size: 16px; line-height: 1.4; }
+
+/* ==========================================================
+   5. СТАТУС ЖӘНЕ БАСТЫ БАТЫРМА
+   ========================================================== */
+#status { min-height: 34px; margin: 0 4px 8px; text-align: center; font-size: 13px; line-height: 1.35;
+  color: rgba(223,248,255,.65); }
+#status.err { color: #ffb86b; }
+
+#mic {
+  width: 100%; min-height: 64px; border: 0; border-radius: 22px;
+  font: 700 19px/1 -apple-system, sans-serif; color: #021018; letter-spacing: .3px;
+  background: linear-gradient(135deg, rgb(var(--c-rgb)), rgba(var(--c-rgb), .65));
+  box-shadow: 0 6px 26px rgba(var(--c-rgb), .45);
+  transition: transform .15s, background .4s;
+}
+#mic:active { transform: scale(.97); }
+body[data-mode="listening"] #mic { animation: micPulse 1.1s ease-in-out infinite; }
+body[data-mode="listening"] #mic .ico { display: inline-block; animation: wiggle .5s ease-in-out infinite; }
+
+/* ==========================================================
+   6. ЖАТЫҚ ҰСТАҒАНДА ЕСКЕРТУ
+   ========================================================== */
+.rotate { display: none; position: fixed; inset: 0; z-index: 10; background: var(--bg);
+  align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 18px; }
+@media (orientation: landscape) and (max-height: 500px) { .rotate { display: flex; } }
+
+/* ==========================================================
+   7. АНИМАЦИЯЛАР
+   ========================================================== */
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.07); } }
+@keyframes look { 0%, 100% { transform: translate(-50%, -50%); } 30% { transform: translate(-10%, -55%); } 65% { transform: translate(-90%, -45%); } }
+@keyframes pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes scan { to { top: 110%; } }
+@keyframes wave { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 34px rgba(var(--c-rgb), .35), inset 0 0 30px rgba(var(--c-rgb), .15); }
+  50% { box-shadow: 0 0 70px rgba(var(--c-rgb), .75), inset 0 0 50px rgba(var(--c-rgb), .3); }
+}
+@keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(var(--c-rgb), .6); } 50% { box-shadow: 0 0 0 16px rgba(var(--c-rgb), 0); } }
+@keyframes wiggle { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@media (prefers-reduced-motion: reduce) { .face::after, .pupil, .ring { animation: none !important; } }
+</style>
+</head>
+
+<body data-mode="idle">
+
+<div class="rotate">📱 Телефонды тік ұстаңыз</div>
+
+<div class="top">
+  <button id="lang" type="button" aria-label="Тану тілін ауыстыру">ҚАЗ</button>
+</div>
+
+<main class="stage">
+  <div class="face-wrap">
+    <div class="antenna"></div>
+    <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    <div class="face">
+      <div class="eyes">
+        <div class="eye l"><div class="pupil"></div><div class="glint"></div></div>
+        <div class="eye r"><div class="pupil"></div><div class="glint"></div></div>
+      </div>
+      <div class="nose"></div>
+      <div class="mouth" id="mouth" data-s="idle"></div>
+    </div>
+  </div>
+</main>
+
+<section class="hud" aria-live="polite">
+  <div class="row"><span class="tag">СЕН</span><p id="q">Мікрофон батырмасын басып, сұрағыңды айт.</p></div>
+  <div class="row"><span class="tag">РОБОТ</span><p id="a">Сәлем! Мен сені тыңдауға дайынмын.</p></div>
+</section>
+
+<div id="status" role="status"></div>
+<button id="mic" type="button"><span class="ico">🎤</span> <span id="micLabel">Тыңдау</span></button>
+
+<script>
+/* ==========================================================
+   А. ЭЛЕМЕНТТЕР МЕН ЖАЛПЫ КҮЙ
+   ========================================================== */
+const $ = (id) => document.getElementById(id);
+const mouth = $("mouth"), qEl = $("q"), aEl = $("a"), statusEl = $("status");
+const micBtn = $("mic"), micLabel = $("micLabel"), langBtn = $("lang");
+
+let mode = "idle";            // idle | listening | thinking | speaking
+let recognition = null;       // SpeechRecognition нысаны
+let mouthTimer = null;        // сөйлеу кезіндегі ауыз анимациясының таймері
+let speakGuard = null;        // TTS тоқтап қалса, қорғаныс таймері
+let noKkVoiceWarned = false;
+
+// Дауыс тану тілдері: ҚАЗ -> РУС -> ENG
+const LANGS = [
+  { code: "kk-KZ", label: "ҚАЗ" },
+  { code: "ru-RU", label: "РУС" },
+  { code: "en-US", label: "ENG" }
+];
+let langIdx = 0;
+
+/* ==========================================================
+   Ә. РЕЖИМДІ ОРНАТУ (түс, ауыз, батырма мәтіні)
+   ========================================================== */
+function setMode(m) {
+  mode = m;
+  document.body.dataset.mode = m;
+  if (m !== "speaking") mouth.dataset.s = (m === "idle") ? "idle" : m;
+  micLabel.textContent =
+    m === "listening" ? "Тыңдап тұрмын..." :
+    m === "thinking"  ? "Ойланып жатырмын..." :
+    m === "speaking"  ? "Сөйлеп тұр... (тоқтату)" : "Тыңдау";
+}
+
+function showStatus(text, isError) {
+  statusEl.textContent = text || "";
+  statusEl.className = isError ? "err" : "";
+}
+
+/* ==========================================================
+   Б. ТІЛ ТАҢДАУ БАТЫРМАСЫ
+   ========================================================== */
+langBtn.addEventListener("click", () => {
+  langIdx = (langIdx + 1) % LANGS.length;
+  langBtn.textContent = LANGS[langIdx].label;
+  showStatus("Дауыс тану тілі: " + LANGS[langIdx].code);
+});
+
+/* ==========================================================
+   В. ДАУЫС ТАНУ (Speech Recognition)
+   ========================================================== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function startListening() {
+  if (!SR) {
+    showStatus("Бұл браузерде дауысты тану функциясы қолдау таппады. iPhone үшін Safari браузерінде қолданып көріңіз.", true);
+    return;
+  }
+  if (!navigator.onLine) {
+    showStatus("Интернет байланысы жоқ. Дауыс тану үшін интернет қажет.", true);
+    return;
+  }
+
+  stopSpeaking();
+  unlockSpeech();               // iOS: дыбыс шығаруға рұқсатты басу кезінде «ашамыз»
+
+  let text = "", hadError = false;
+  const rec = new SR();
+  recognition = rec;
+  rec.lang = LANGS[langIdx].code;
+  rec.interimResults = true;    // сөйлеп жатқанда да мәтінді көрсету
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
+
+  rec.onstart = () => { setMode("listening"); showStatus("Айта бер, мен тыңдап тұрмын..."); };
+
+  rec.onresult = (e) => {
+    text = "";
+    for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+    qEl.textContent = text;
+  };
+
+  rec.onerror = (e) => {
+    hadError = true;
+    handleRecError(e.error);
+  };
+
+  rec.onend = () => {
+    recognition = null;
+    if (mode === "listening") setMode("idle");
+    text = text.trim();
+    if (text) {
+      handleQuestion(text);
+    } else if (!hadError) {
+      showStatus("Ештеңе естімедім. Батырманы басып, қайта айтып көр.", true);
+    }
+  };
+
+  try {
+    rec.start();
+  } catch (err) {
+    setMode("idle");
+    showStatus("Дауыс танудан іске қосу мүмкін болмады. Бетті жаңартып, қайта көр.", true);
+  }
+}
+
+function stopListening() {
+  if (recognition) { try { recognition.stop(); } catch (e) {} }
+}
+
+function handleRecError(code) {
+  const msg = {
+    "not-allowed": "Микрофонға рұқсат берілмеді. Баптаулар → Safari → Микрофон бөлімінен рұқсат беріп, бетті жаңарт. Сондай-ақ Баптаулар → Негізгі → Пернетақта ішінде «Диктовка» қосулы болуы керек.",
+    "service-not-allowed": "Дауыс тану қызметіне рұқсат жоқ. Баптаулар → Негізгі → Пернетақта → «Диктовканы» қос, содан кейін қайта көр.",
+    "audio-capture": "Микрофон табылмады немесе қолжетімсіз. Басқа қолданба микрофонды пайдаланып тұрған жоқ па, тексер.",
+    "no-speech": "Ештеңе естімедім. Батырманы басып, қайта айтып көр.",
+    "network": "Интернет жоқ немесе дауыс тану қызметіне қосыла алмадым. Байланысты тексер.",
+    "language-not-supported": "Бұл тіл дауыс тануда қолдау таппады. Жоғарғы оң бұрыштағы тіл батырмасымен РУС немесе ENG таңдап көр."
+  }[code];
+  if (code === "aborted") return;   // пайдаланушы өзі тоқтатты
+  showStatus(msg || ("Дауыс тану қатесі болды (" + code + "). Қайта көр."), true);
+}
+
+/* ==========================================================
+   Г. ЖАУАП БЕРУ ЛОГИКАСЫ
+   ========================================================== */
+async function handleQuestion(text) {
+  qEl.textContent = text;
+  setMode("thinking");
+  showStatus("");
+  let answer;
+  try {
+    answer = await askAI(text);
+  } catch (err) {
+    answer = "Кешір, жауап беру кезінде қате болды. Қайта көрші.";
+  }
+  aEl.textContent = answer;
+  await speak(answer);
+}
+
+/* ==========================================================
+   Claude API: сұраныс Cloudflare Worker арқылы жіберіледі.
+   API кілті бұл файлда ЖОҚ — ол тек Cloudflare ішіндегі Secret-те сақталады:
+   Телефон -> Осы бет -> Cloudflare Worker -> Claude API -> Worker -> Телефон
+   ========================================================== */
+const WORKER_URL = "https://winter-butterfly-6798.na1925956.workers.dev/";   // Worker сілтемесін осы жерге қоясың
+const history = [];            // соңғы сұрақ-жауаптар (әңгіме жалғасуы үшін)
+const MAX_HISTORY = 6;
+
+async function askAI(question) {
+  const local = localAnswer(question);
+  if (local) return local;
+
+  if (WORKER_URL.includes("PASTE-WORKER-URL-HERE")) {
+    return "Мен әлі Claude мейіріне қосылмағанмын. Worker сілтемесін кодқа қою керек.";
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const r = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [...history, { role: "user", content: question }],
+        lang: LANGS[langIdx].code
+      }),
+      signal: ctrl.signal
+    });
+    if (r.status === 429) return "Сұрақ тым жиі болды. Азғана күтіп, қайта сұрашы.";
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.answer) return "Кешір, қазір жауап бере алмадым. Сәлден соң қайта көрші.";
+
+    history.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+    while (history.length > MAX_HISTORY) history.shift();
+    return data.answer;
+  } catch (e) {
+    return (e && e.name === "AbortError")
+      ? "Жауап тым ұзақ келді. Қайта көрші."
+      : "Интернетке қосыла алмадым. Байланысты тексеріп көр.";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ---------- Дайын жауаптар ---------- */
+function normalize(t) {
+  return t.toLowerCase().replace(/[?!.,;]/g, " ").replace(/\s+/g, " ").trim();
+}
+const has = (t, arr) => arr.some((w) => t.includes(w));
+
+const MONTHS = ["қаңтар","ақпан","наурыз","сәуір","мамыр","маусым","шілде","тамыз","қыркүйек","қазан","қараша","желтоқсан"];
+
+// Тек құрылғының өзі біледі: сағат пен күн. Қалған барлық сұраққа Claude жауап береді.
+const RULES = [
+  { test: (t) => has(t, ["сағат қанша", "уақыт қанша", "қазір сағат"]),
+    reply: () => { const d = new Date(); return "Қазір сағат " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + "."; } },
+  { test: (t) => has(t, ["бүгін қай күн", "бүгін не күн", "бүгінгі күн", "бүгін күні қанша", "бүгін қай жыл"]),
+    reply: () => { const d = new Date(); return "Бүгін " + d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear() + " жыл."; } }
+];
+
+function localAnswer(question) {
+  const t = normalize(question);
+  const m = solveMath(t);
+  if (m) return m;
+  for (const rule of RULES) if (rule.test(t)) return rule.reply();
+  return null;
+}
+
+/* ---------- Математика ---------- */
+// Қазақша сандарды цифрға айналдыру (тек есептеу сұрағында қолданылады)
+const NUM_WORDS = { "нөл":0,"бір":1,"екі":2,"үш":3,"төрт":4,"бес":5,"алты":6,"жеті":7,"сегіз":8,"тоғыз":9,
+  "он":10,"жиырма":20,"отыз":30,"қырық":40,"елу":50,"алпыс":60,"жетпіс":70,"сексен":80,"тоқсан":90,"жүз":100 };
+
+function wordsToDigits(s) {
+  const keys = Object.keys(NUM_WORDS).sort((a, b) => b.length - a.length);
+  s = s.split(" ").map((tok) => {
+    if (/^\d/.test(tok)) return tok;
+    for (const k of keys) {
+      if (tok.startsWith(k) && tok.length - k.length <= 3) return String(NUM_WORDS[k]);
+    }
+    return tok;
+  }).join(" ");
+  // «жиырма бес» -> 20 + 5 = 25
+  return s.replace(/\b([1-9]0)\s+([1-9])\b/g, (_, a, b) => String(Number(a) + Number(b)));
+}
+
+// Жалғаулар: табыс септік (-ді/-ні...) және барыс септік (-ге/-ке...)
+const ACC = ["ді","ді","ні","ті","ті","ті","ны","ні","ді","ды"];
+const DAT = ["ге","ге","ге","ке","ке","ке","ға","ге","ге","ға"];
+const TENS_ACC = { 10:"ды", 20:"ны", 30:"ды", 40:"ты", 50:"ді", 60:"ты", 70:"ті", 80:"ді", 90:"ды", 100:"ді" };
+const TENS_DAT = { 10:"ға", 20:"ға", 30:"ға", 40:"қа", 50:"ге", 60:"қа", 70:"ке", 80:"ге", 90:"ға", 100:"ге" };
+
+function suffix(n, kind) {
+  if (!Number.isInteger(n) || n < 0 || n > 100) return null;
+  const tens = kind === "acc" ? TENS_ACC : TENS_DAT;
+  const ones = kind === "acc" ? ACC : DAT;
+  if (n !== 0 && n % 10 === 0) return n + "-" + tens[n];
+  return n + "-" + ones[n % 10];
+}
+
+function solveMath(t) {
+  let s = t.replace(/(\d)\s*,\s*(\d)/g, "$1.$2");
+  const hasWord = /көбейт|қос|плюс|азайт|шегер|минус|бөл/.test(s);
+  if (hasWord) s = wordsToDigits(s);
+
+  let a, b, op;
+  const pureMath = /^[\d\s.,+\-−–×*xх÷\/:=?]+$/.test(s);
+  const sym = (pureMath || hasWord) ? s.match(/(\d+(?:\.\d+)?)\s*([+\-−–×*xх÷\/:])\s*(\d+(?:\.\d+)?)/i) : null;
+  if (sym) {
+    a = parseFloat(sym[1]); b = parseFloat(sym[3]);
+    const o = sym[2];
+    op = o === "+" ? "+" : /[\-−–]/.test(o) ? "-" : /[×*xх]/i.test(o) ? "*" : "/";
+  } else if (hasWord) {
+    const nums = s.match(/\d+(?:\.\d+)?/g);
+    if (!nums || nums.length < 2) return null;
+    a = parseFloat(nums[0]); b = parseFloat(nums[1]);
+    if (/көбейт/.test(s)) op = "*";
+    else if (/қос|плюс/.test(s)) op = "+";
+    else if (/азайт|шегер|минус/.test(s)) op = "-";
+    else if (/бөл/.test(s)) op = "/";
+    else return null;
+  } else {
+    return null;
+  }
+
+  if (op === "/" && b === 0) return "Нөлге бөлуге болмайды.";
+  const r = Math.round((op === "+" ? a + b : op === "-" ? a - b : op === "*" ? a * b : a / b) * 1e6) / 1e6;
+  const R = String(r).replace(".", ",");
+
+  // Жалғауы дұрыс қойылатын жағдайлар
+  if (op === "*") {
+    const x = suffix(a, "acc"), y = suffix(b, "dat");
+    if (x && y) return x + " " + y + " көбейтсек, " + R + " болады.";
+  }
+  if (op === "+") {
+    const x = suffix(a, "dat"), y = suffix(b, "acc");
+    if (x && y) return x + " " + y + " қоссақ, " + R + " болады.";
+  }
+  // Қалған жағдайларда жалғаусыз, бейтарап жауап
+  const word = { "+": "қосу", "-": "минус", "*": "көбейту", "/": "бөлу" }[op];
+  return a + " " + word + " " + b + " тең " + R + ".";
+}
+
+/* ==========================================================
+   Д. ДАУЫСТАП ОҚУ (Speech Synthesis)
+   ========================================================== */
+function getVoices() {
+  return ("speechSynthesis" in window) ? window.speechSynthesis.getVoices() : [];
+}
+// Safari дауыстарды кешірек жүктейді
+if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = getVoices;
+
+function pickVoice() {
+  const v = getVoices();
+  const starts = (p) => v.find((x) => x.lang && x.lang.toLowerCase().replace("_", "-").startsWith(p));
+  const kk = starts("kk");
+  if (kk) return { voice: kk, exact: true };
+  return { voice: starts("ru") || starts("tr") || null, exact: false };   // ең жақын дауыс
+}
+
+// iOS Safari: алғашқы дыбыс міндетті түрде басу (жест) ішінде басталуы керек
+function unlockSpeech() {
+  if (!("speechSynthesis" in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (!("speechSynthesis" in window)) {
+      setMode("idle");
+      showStatus("Бұл браузерде дауыстап оқу қолдау таппады. Жауап тек мәтін түрінде көрсетілді.", true);
+      return resolve();
+    }
+    window.speechSynthesis.cancel();
+
+    // Эмодзилерді оқымау үшін тазалаймыз
+    const clean = text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim();
+    const u = new SpeechSynthesisUtterance(clean);
+    const { voice, exact } = pickVoice();
+    if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = "kk-KZ"; }
+    u.rate = 0.95;
+    u.pitch = 1.0;
+
+    if (!exact && !noKkVoiceWarned) {
+      noKkVoiceWarned = true;
+      showStatus("Қазақша дауыс табылмады, ең жақын дауыс қолданылды.");
+    }
+
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(speakGuard);
+      stopMouth();
+      setMode("idle");
+      resolve();
+    };
+    u.onstart = () => { setMode("speaking"); startMouth(); };
+    u.onend = done;
+    u.onerror = done;
+
+    // Кейде iOS onend оқиғасын жібермей қалады, сондықтан қорғаныс таймері
+    speakGuard = setTimeout(done, clean.length * 130 + 4000);
+    window.speechSynthesis.speak(u);
+  });
+}
+
+function stopSpeaking() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  clearTimeout(speakGuard);
+  stopMouth();
+  if (mode === "speaking") setMode("idle");
+}
+
+/* ---------- Ауыз анимациясы (сөйлеу кезінде кадрлар ауысады) ---------- */
+function startMouth() {
+  stopMouth();
+  let last = -1;
+  mouthTimer = setInterval(() => {
+    let f;
+    do { f = Math.floor(Math.random() * 4); } while (f === last);   // бірдей кадр қатарынан келмесін
+    last = f;
+    mouth.dataset.s = "f" + f;
+  }, 130);
+}
+function stopMouth() {
+  clearInterval(mouthTimer);
+  mouthTimer = null;
+  if (mode !== "speaking") mouth.dataset.s = (mode === "idle") ? "idle" : mode;
+}
+
+/* ==========================================================
+   Е. БАСТЫ БАТЫРМА
+   ========================================================== */
+micBtn.addEventListener("click", () => {
+  if (mode === "listening") { stopListening(); return; }
+  if (mode === "speaking")  { stopSpeaking(); return; }
+  if (mode === "thinking")  { return; }
+  startListening();
+});
+
+// Бет көрінбей қалса (мысалы, басқа қолданбаға өтсе), барлығын тоқтатамыз
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { stopListening(); stopSpeaking(); setMode("idle"); }
+});
+window.addEventListener("offline", () => showStatus("Интернет байланысы жоғалды.", true));
+window.addEventListener("online",  () => showStatus("Интернет қайта қосылды."));
+
+// Басында қолдау бар-жоғын тексереміз
+if (!SR) showStatus("Бұл браузерде дауысты тану функциясы қолдау таппады. iPhone үшін Safari браузерінде қолданып көріңіз.", true);
+else if (!("speechSynthesis" in window)) showStatus("Бұл браузерде дауыстап оқу қолдау таппады.", true);
+</script>
+</body>
+</html>
