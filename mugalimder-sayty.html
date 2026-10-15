@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Мұғалімдерге арналған ойын сайты</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Serif:wght@700&display=swap&subset=cyrillic,cyrillic-ext">
+<style>
+:root{
+  --bg:#f6f3ec; --ink:#1d2b2a; --muted:#56655f; --board:#1f4d43; --chalk:#f4f1e8; --yellow:#f2c94c;
+  --c1:#e8f1ee; --c2:#fbeec2; --c3:#e3ecf8; --c4:#f6e1e4;
+  --a1:#1f4d43; --a2:#8a6a00; --a3:#24508c; --a4:#8c2f43;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a19; --ink:#eef1ea; --muted:#a3b2ac; --board:#183a33; --chalk:#f4f1e8;
+    --c1:#1c2e2a; --c2:#2e2916; --c3:#1a2536; --c4:#33202a;
+    --a1:#7fd1bb; --a2:#f2c94c; --a3:#8fb8f0; --a4:#f0a0b2; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a19; --ink:#eef1ea; --muted:#a3b2ac; --board:#183a33; --chalk:#f4f1e8;
+  --c1:#1c2e2a; --c2:#2e2916; --c3:#1a2536; --c4:#33202a;
+  --a1:#7fd1bb; --a2:#f2c94c; --a3:#8fb8f0; --a4:#f0a0b2; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"PT Sans",system-ui,sans-serif;font-size:18px;line-height:1.5}
+.board{background:var(--board);color:var(--chalk);padding:56px 20px 64px;border-bottom:8px solid var(--yellow)}
+.board .in{max-width:900px;margin:0 auto}
+h1{font-family:"PT Serif",Georgia,serif;font-size:clamp(30px,6vw,52px);line-height:1.15;margin:0 0 16px;max-width:18ch}
+.board p{margin:0;max-width:56ch;font-size:20px;opacity:.92}
+main{max-width:900px;margin:0 auto;padding:40px 20px 56px}
+h2{font-family:"PT Serif",Georgia,serif;font-size:26px;margin:0 0 22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px}
+.btn{display:flex;gap:18px;align-items:center;padding:22px;border-radius:14px;text-decoration:none;color:var(--ink);border:2px solid transparent;transition:transform .15s,border-color .15s}
+.btn:hover{transform:translateY(-3px)}
+.btn:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.btn .ic{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:32px;background:var(--bg)}
+.btn b{display:block;font-size:21px;line-height:1.25;margin-bottom:4px}
+.btn span{color:var(--muted);font-size:16px}
+.b1{background:var(--c1)} .b1:hover{border-color:var(--a1)}
+.b2{background:var(--c2)} .b2:hover{border-color:var(--a2)}
+.b3{background:var(--c3)} .b3:hover{border-color:var(--a3)}
+.b4{background:var(--c4)} .b4:hover{border-color:var(--a4)}
+.note{margin-top:28px;color:var(--muted);font-size:16px}
+footer{text-align:center;color:var(--muted);font-size:15px;padding:0 20px 32px}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}.btn:hover{transform:none}}
+</style>
+</head>
+<body>
+<header class="board">
+  <div class="in">
+    <h1>Сабаққа арналған ойындар мен жаттығулар</h1>
+    <p>Мұғалімдерге арналған цифрлық ресурстар. Керекті ойынды таңдап, батырманы басыңыз.</p>
+  </div>
+</header>
+<main>
+  <h2>Ойынды таңдаңыз</h2>
+  <div class="grid">
+    <a class="btn b1" href="https://knowledge-pyramid-builder.lovable.app/" target="_blank" rel="noopener noreferrer">
+      <div class="ic" aria-hidden="true">🔺</div>
+      <div><b>Білім пирамидасы</b><span>Білімді қабат-қабатымен құрастыратын ойын</span></div>
+    </a>
+    <a class="btn b2" href="https://kid-creator-lab.lovable.app/" target="_blank" rel="noopener noreferrer">
+      <div class="ic" aria-hidden="true">🎮</div>
+      <div><b>Цифрлық ойын жобалары</b><span>Оқушылар өз ойынын жасайтын лаборатория</span></div>
+    </a>
+    <a class="btn b3" href="https://eager-quiz-trail.lovable.app" target="_blank" rel="noopener noreferrer">
+      <div class="ic" aria-hidden="true">❓</div>
+      <div><b>Қызықты викторина</b><span>Сұрақ-жауап арқылы білімді тексеру</span></div>
+    </a>
+    <a class="btn b4" href="https://curious-cog-quest.lovable.app" target="_blank" rel="noopener noreferrer">
+      <div class="ic" aria-hidden="true">🧠</div>
+      <div><b>Нейродидактикалық жаттығулар</b><span>Зейін мен есті дамытатын тапсырмалар</span></div>
+    </a>
+  </div>
+  <p class="note">Әр ойын жаңа бетте ашылады, сондықтан бұл бет ашық күйінде қалады.</p>
+</main>
+<footer>Мұғалімдерге арналған сайт</footer>
+</body>
+</html>
